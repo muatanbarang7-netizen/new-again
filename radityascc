@@ -1,0 +1,122 @@
+-- [[ BEE SWARM ULTIMATE GUI - BY GEMINI ]]
+local ScreenGui = Instance.new("ScreenGui")
+local MainFrame = Instance.new("Frame")
+local Title = Instance.new("TextLabel")
+local ToggleFarm = Instance.new("TextButton")
+local ToggleQuest = Instance.new("TextButton")
+local ToggleBuy = Instance.new("TextButton")
+
+-- Setup GUI Dasar
+ScreenGui.Parent = game:GetService("CoreGui")
+MainFrame.Name = "BeeGui"
+MainFrame.Parent = ScreenGui
+MainFrame.BackgroundColor3 = Color3.fromRGB(45, 45, 45)
+MainFrame.Position = UDim2.new(0.05, 0, 0.3, 0)
+MainFrame.Size = UDim2.new(0, 150, 0, 200)
+MainFrame.Active = true
+MainFrame.Draggable = true -- Bisa digeser pakai mouse
+
+Title.Parent = MainFrame
+Title.Text = "BEE SIM MENU"
+Title.Size = UDim2.new(1, 0, 0.2, 0)
+Title.TextColor3 = Color3.new(1, 1, 1)
+Title.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
+
+-- Fungsi Membuat Tombol dengan Cepat
+local function createBtn(name, text, pos, color)
+    local btn = Instance.new("TextButton")
+    btn.Name = name
+    btn.Parent = MainFrame
+    btn.Text = text
+    btn.Position = pos
+    btn.Size = UDim2.new(0.9, 0, 0.2, 0)
+    btn.BackgroundColor3 = color
+    btn.TextColor3 = Color3.new(1, 1, 1)
+    btn.BorderSizePixel = 0
+    return btn
+end
+
+local farmBtn = createBtn("FarmBtn", "Auto Farm: OFF", UDim2.new(0.05, 0, 0.25, 0), Color3.fromRGB(200, 50, 50))
+local questBtn = createBtn("QuestBtn", "Auto Quest: OFF", UDim2.new(0.05, 0, 0.50, 0), Color3.fromRGB(200, 50, 50))
+local buyBtn = createBtn("BuyBtn", "Auto Buy: OFF", UDim2.new(0.05, 0, 0.75, 0), Color3.fromRGB(200, 50, 50))
+
+-- LOGIKA PROGRAM
+local Players = game:GetService("Players")
+local LP = Players.LocalPlayer
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local VirtualUser = game:GetService("VirtualUser")
+
+_G.AutoFarm = false
+_G.AutoQuest = false
+_G.AutoBuy = false
+
+-- Toggle Events
+farmBtn.MouseButton1Click:Connect(function()
+    _G.AutoFarm = not _G.AutoFarm
+    farmBtn.Text = _G.AutoFarm and "Auto Farm: ON" or "Auto Farm: OFF"
+    farmBtn.BackgroundColor3 = _G.AutoFarm and Color3.fromRGB(50, 200, 50) or Color3.fromRGB(200, 50, 50)
+end)
+
+questBtn.MouseButton1Click:Connect(function()
+    _G.AutoQuest = not _G.AutoQuest
+    questBtn.Text = _G.AutoQuest and "Auto Quest: ON" or "Auto Quest: OFF"
+    questBtn.BackgroundColor3 = _G.AutoQuest and Color3.fromRGB(50, 200, 50) or Color3.fromRGB(200, 50, 50)
+end)
+
+buyBtn.MouseButton1Click:Connect(function()
+    _G.AutoBuy = not _G.AutoBuy
+    buyBtn.Text = _G.AutoBuy and "Auto Buy: ON" or "Auto Buy: OFF"
+    buyBtn.BackgroundColor3 = _G.AutoBuy and Color3.fromRGB(50, 200, 50) or Color3.fromRGB(200, 50, 50)
+end)
+
+-- Main Loop (Optimasi Ping 90-110ms)
+task.spawn(function()
+    while task.wait(0.1) do
+        local char = LP.Character
+        local hrp = char and char:FindFirstChild("HumanoidRootPart")
+        
+        if _G.AutoFarm and hrp then
+            -- 1. Auto Dig
+            local tool = char:FindFirstChildOfClass("Tool")
+            if tool then tool:Activate() end
+            
+            -- 2. Auto Collect (Ping Friendly)
+            for _, v in pairs(workspace.Collectibles:GetChildren()) do
+                if (v.Position - hrp.Position).Magnitude < 25 then
+                    hrp.CFrame = v.CFrame
+                    task.wait(0.05)
+                    break
+                end
+            end
+            
+            -- 3. Jual Madu jika Tas Penuh (>95%)
+            local stats = LP:FindFirstChild("CoreStats")
+            if stats and (stats.Pollen.Value / stats.Capacity.Value) > 0.95 then
+                local hive = workspace.Honeycombs:FindFirstChild(LP.Name)
+                if hive then
+                    hrp.CFrame = hive.SpawnLocation.CFrame + Vector3.new(0, 3, 0)
+                    task.wait(0.5)
+                    ReplicatedStorage.Events.PlayerHiveCommand:FireServer("MakeHoney")
+                    repeat task.wait(1) until (stats.Pollen.Value / stats.Capacity.Value) < 0.05
+                    
+                    if _G.AutoQuest then
+                        -- Ke Black Bear setelah jual madu
+                        hrp.CFrame = CFrame.new(-84, 4, 340)
+                        task.wait(0.5)
+                        ReplicatedStorage.Events.PlayerQuestEvent:FireServer("AcceptQuest", "Black Bear")
+                    end
+
+                    if _G.AutoBuy then
+                        ReplicatedStorage.Events.ItemPackageEvent:FireServer("Buy", {["Type"] = "Collector", ["Name"] = "Pollen Dipper"})
+                    end
+                end
+            end
+        end
+    end
+end)
+
+-- Anti-AFK
+LP.Idled:Connect(function()
+    VirtualUser:CaptureController()
+    VirtualUser:ClickButton2(Vector2.new())
+end)
